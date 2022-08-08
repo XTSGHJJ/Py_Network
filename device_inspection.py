@@ -1,10 +1,9 @@
 from openpyxl import load_workbook
 from netmiko import ConnectHandler
 from time import strftime
-from re_list import hw_re
-from os import listdir
 from  threading import Thread
-import time
+from time import time
+from Get_info import filter_DevInfo
 
 
 def netmiko_dev_connect(ip,username,passwd,check_comm,dev_type,back_file):
@@ -16,14 +15,20 @@ def netmiko_dev_connect(ip,username,passwd,check_comm,dev_type,back_file):
     for comm in check_comm: #发送命令，保存输出
         #strip_prompt用于在输出的文本中会显示设备名
         #strip_command用于在输出的文本中显示输入的命令
-        content = connect.send_command(comm,strip_prompt=False,strip_command=False) 
-        with open(back_file + dev_name + now_time + '.txt','a',encoding='utf-8') as backup_conf: #以设备名+时间命名的txt输出文件
+        content = connect.send_command(comm,strip_prompt=False,strip_command=False)
+        backup_dev_name  = back_file + dev_name + now_time
+        with open( backup_dev_name + '.txt','a',encoding='utf-8') as backup_conf: #以设备名+时间命名的txt输出文件
             backup_conf.write(content + '\n')
+            
+    re_result = filter_DevInfo(backup_dev_name)
+    
         # success_list.append(dev_name + '-' + str(ip))
     # except:
     #     # fail_list.append(ip)
     #     pass
 
+
+#judge函数，用于判断设备类型，根据设备类型获取不同文件夹下的对应的设备命令，返回巡检文件保存的目录路径
 def dev_judge(DeviceBrand):
     dev_value = DeviceBrand.lower().strip()
     #Huawei
@@ -55,16 +60,17 @@ def dev_judge(DeviceBrand):
         return 'None' #如果没判断出来返回一个none
 
 def main():
-    start_time = time.time()
+    start_time = time() #记录时间
     wb = load_workbook('device_info.xlsx')
     ws =wb.active
-    row_range = ws.max_row
-    test_therad = []
+    row_range = ws.max_row #行数
+    therad_list = []
     for row_list in range(2,row_range+1):
         dev_info = ws[row_list]
         dev_temp = []
         for i in dev_info:
             dev_temp.append(i.value)
+        
         # dev_name = dev_temp[1]
         # dev_type = dev_temp[2]
         # dev_connect = dev_temp[4]
@@ -77,20 +83,13 @@ def main():
             check_command = open(judge_result[1],'r')
             thread_netmiko = Thread(target=netmiko_dev_connect,args=(dev_temp[7],dev_temp[5],dev_temp[6],check_command,dev_temp[2],judge_result[2]))
             thread_netmiko.start()
-            test_therad.append(thread_netmiko)
+            therad_list.append(thread_netmiko)
         else:
             print('不支持此设备:',dev_temp[1])
-    for y in test_therad:
+    for y in therad_list:
         y.join()
 
-        # netmiko_dev_connect(dev_temp[7],dev_temp[5],dev_temp[6],check_command,dev_temp[2],hw_bac_path)
-
-        # for s_file in listdir(hw_bac_path):
-        #     with open (hw_bac_path + s_file,'r', encoding='utf-8', errors='ignore') as file:
-        #         for i in file.readlines():
-        #             hw_re()
-        #print(hw_re())
-    end_time = time.time()
+    end_time = time()
     total_time = end_time - start_time
     print(total_time) 
 
